@@ -3,6 +3,7 @@ package kz.shymkent.weatherapp;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Typeface;
+import android.os.Handler;
 import android.text.style.CharacterStyle;
 import android.text.style.StyleSpan;
 import android.util.Log;
@@ -66,7 +67,7 @@ public class PlaceAutocompleteAdapter
      */
     public PlaceAutocompleteAdapter(Context context, GeoDataClient geoDataClient,
                                     LatLngBounds bounds, AutocompleteFilter filter) {
-        super(context, android.R.layout.simple_expandable_list_item_2, android.R.id.text1);
+        super(context, android.R.layout.simple_list_item_1, android.R.id.text1);
         mGeoDataClient = geoDataClient;
         mBounds = bounds;
         mPlaceFilter = filter;
@@ -106,9 +107,9 @@ public class PlaceAutocompleteAdapter
         AutocompletePrediction item = getItem(position);
 
         TextView textView1 = (TextView) row.findViewById(android.R.id.text1);
-        TextView textView2 = (TextView) row.findViewById(android.R.id.text2);
+       // TextView textView2 = (TextView) row.findViewById(android.R.id.text2);
         textView1.setText(item.getPrimaryText(STYLE_BOLD));
-        textView2.setText(item.getSecondaryText(STYLE_BOLD));
+       // textView2.setText(item.getSecondaryText(STYLE_BOLD));
 
         return row;
     }
@@ -161,7 +162,7 @@ public class PlaceAutocompleteAdapter
                 // Override this method to display a readable result in the AutocompleteTextView
                 // when clicked.
                 if (resultValue instanceof AutocompletePrediction) {
-                    return ((AutocompletePrediction) resultValue).getFullText(null);
+                    return ((AutocompletePrediction) resultValue).getPrimaryText(null);
                 } else {
                     return super.convertResultToString(resultValue);
                 }
@@ -185,7 +186,9 @@ public class PlaceAutocompleteAdapter
      */
     @SuppressLint("LongLogTag")
     private ArrayList<AutocompletePrediction> getAutocomplete(CharSequence constraint) {
-        Log.i(TAG, "Starting autocomplete query for: " + constraint);
+        LastRequestORM lastRequestORM = new LastRequestORM();
+        lastRequestORM.insertRequest(getContext(),constraint.toString());
+
 
         // Submit the query to the autocomplete API and retrieve a PendingResult that will
         // contain the results when the query completes.
@@ -203,7 +206,6 @@ public class PlaceAutocompleteAdapter
 
         try {
             AutocompletePredictionBufferResponse autocompletePredictions = results.getResult();
-
             Log.i(TAG, "Query completed. Received " + autocompletePredictions.getCount()
                     + " predictions.");
 

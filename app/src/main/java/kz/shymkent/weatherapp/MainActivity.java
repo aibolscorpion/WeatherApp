@@ -1,5 +1,6 @@
 package kz.shymkent.weatherapp;
 
+import android.content.Context;
 import android.os.AsyncTask;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
@@ -7,155 +8,141 @@ import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.text.Editable;
-import android.text.Html;
 import android.text.TextWatcher;
 import android.util.Log;
-import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
-import android.widget.EditText;
 import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.location.places.AutocompleteFilter;
 import com.google.android.gms.location.places.GeoDataClient;
-import com.google.android.gms.location.places.Place;
 import com.google.android.gms.location.places.Places;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.LatLngBounds;
 
-import org.json.JSONException;
-import org.json.JSONObject;
 
-import java.text.DateFormat;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.Locale;
-import java.util.Set;
+import java.util.List;
+
+import io.reactivex.Scheduler;
+import io.reactivex.android.schedulers.AndroidSchedulers;
+import io.reactivex.disposables.CompositeDisposable;
+import io.reactivex.functions.Consumer;
+import io.reactivex.schedulers.Schedulers;
+import kz.shymkent.weatherapp.Retrofit.IMyAPI;
+import kz.shymkent.weatherapp.Retrofit.RetrofitClient;
+import kz.shymkent.weatherapp.model.Weathers;
+import retrofit2.Retrofit;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.OnConnectionFailedListener {
-
+    String typedText;
+    CompositeDisposable compositeDisposable = new CompositeDisposable();
     AutoCompleteTextView autoCompleteTextView;
     RecyclerView.LayoutManager mLayoutManager;
     String OPEN_WEATHER_MAP_API = "19e4ed1e456d488284353c7e019a28a2";
     PlaceAutocompleteAdapter placeAutocompleteAdapter;
     RecyclerView recyclerView;
-    MyAdapter myAdapter;
-    ArrayList<City> cities;
+    MyAdapter adapter;
     GoogleApiClient mGoogleApiClient;
     GeoDataClient mGeoDataClient;
-    City city;
-    private static final LatLngBounds BOUNDS_GREATER_SYDNEY = new LatLngBounds(
-            new LatLng(-34.041458, 150.790100), new LatLng(-33.682247, 151.383362));
-
+    Context context;
+    ArrayList<Weathers> citiesORM;
+    List<Weathers> weathersList;
+    CityORM cityORM ;
+    ArrayList<String> requestsORM;
+    LastRequestORM lastRequestORM;
+    IMyAPI myAPI;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Retrofit retrofit = RetrofitClient.getInstance();
+        myAPI = retrofit.create(IMyAPI.class);
+
+        recyclerView = findViewById(R.id.recyclerView);
+        recyclerView.setHasFixedSize(true);
+        mLayoutManager = new LinearLayoutManager(this);
+        recyclerView.setLayoutManager(mLayoutManager);
+
+        cityORM = new CityORM();
+        lastRequestORM = new LastRequestORM();
+        context = getApplicationContext();
         mGeoDataClient = Places.getGeoDataClient(this, null);
         AutocompleteFilter autocompleteFilter = new AutocompleteFilter.Builder().setTypeFilter(AutocompleteFilter.TYPE_FILTER_CITIES).setCountry("KZ").build();
         placeAutocompleteAdapter = new PlaceAutocompleteAdapter(this, mGeoDataClient, new LatLngBounds(new LatLng(0, 0), new LatLng(0, 0)), autocompleteFilter);
 
-        cities = new ArrayList<City>();
         autoCompleteTextView = findViewById(R.id.search_cities_text_view);
-        autoCompleteTextView.setAdapter(placeAutocompleteAdapter);
-        recyclerView = findViewById(R.id.recyclerView);
-        recyclerView.setHasFixedSize(true);
+        weathersList = new ArrayList<Weathers>();
+        citiesORM = cityORM.getCities(context);
+        requestsORM = lastRequestORM.getRequests(context);
 
-        mLayoutManager = new LinearLayoutManager(this);
-
-        recyclerView.setLayoutManager(mLayoutManager);
-        autoCompleteTextView.addTextChangedListener(new TextWatcher() {
-            @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-
+        if (weathersList.size() == 0) {
+            if(citiesORM.size() >0) {
+                weathersList.add(citiesORM.get(citiesORM.size() - 1));
             }
+            if(requestsORM.size() >0){
+                autoCompleteTextView.setText(requestsORM.get(requestsORM.size() - 1));
+            }
+        }
 
-            @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {
-                if (s.length() > 2) {
+            autoCompleteTextView.setAdapter(placeAutocompleteAdapter);
+            adapter = new MyAdapter(weathersList);
+            recyclerView.setAdapter(adapter);
 
-                    taskLoadUp(autoCompleteTextView.getText().toString());
+
+            autoCompleteTextView.addTextChangedListener(new TextWatcher() {
+                @Override
+                public void beforeTextChanged(CharSequence s, int start, int count, int after) {
                 }
-            }
 
-            @Override
-            public void afterTextChanged(Editable s) {
+                @Override
+                public void onTextChanged(CharSequence s, int start, int before, int count) {
 
+                }
 
-            }
-        });
+                @Override
+                public void afterTextChanged(Editable s) {
+                    if (s.length() > 2) {
+
+                        typedText = autoCompleteTextView.getText().toString();
+                        fetchData(typedText);
+                    }
+                }
+            });
+        }
+
+    protected void onStop(){
+        super.onStop();
+        compositeDisposable.clear();
+    }
+    private void fetchData(String typedText){
+
+        compositeDisposable.add(myAPI.getWeather(typedText,"metric",OPEN_WEATHER_MAP_API).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
+                .subscribe(new Consumer<Weathers>() {
+                    @Override
+                    public void accept(Weathers weathers) {
+                        if(weathers.getSys().getCountry().equals("KZ")) {
+                            List<Weathers> newWeathersList = new ArrayList<Weathers>();
+                            newWeathersList.add(weathers);
+                            displayData(newWeathersList);
+
+                            CityORM.insertCity(context,weathers);
+                        }
+                    }}, new Consumer<Throwable>() {
+                        @Override
+                        public void accept(Throwable throwable) {
+                        }
+                }));
     }
 
-    public void taskLoadUp(String query) {
-        if (Function.isNetworkAvailable(getApplicationContext())) {
-            DownloadWeather task = new DownloadWeather();
-            task.execute(query);
-        } else {
-            Toast.makeText(getApplicationContext(), "No Internet Connection", Toast.LENGTH_LONG).show();
-        }
+    private void displayData(List<Weathers> weathers) {
+        adapter.insertData(weathers);
+        recyclerView.smoothScrollToPosition(adapter.getItemCount()-1);
     }
 
     @Override
     public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
 
     }
-
-    class DownloadWeather extends AsyncTask<String, Void, String> {
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-
         }
-
-        protected String doInBackground(String... args) {
-            String xml = Function.excuteGet("http://api.openweathermap.org/data/2.5/weather?q=" + args[0] +
-                    "&units=metric&appid=" + OPEN_WEATHER_MAP_API);
-            Log.i("aibolscorpion", xml);
-
-            return xml;
-        }
-
-        @Override
-        protected void onPostExecute(String xml) {
-
-            try {
-                JSONObject json = new JSONObject(xml);
-                if (json != null) {
-                    JSONObject main = json.getJSONObject("main");
-                    if (json.getJSONObject("sys").getString("country").equals("KZ")) {
-
-                        city = new City();
-                        city.setCity(json.getString("name").toUpperCase(Locale.US));
-                        city.setTemperature(String.format("%.2f", main.getDouble("temp")) + "°");
-                        cities.add(city);
-                        //  currentTemperatureField.setText(String.format("%.2f", main.getDouble("temp")) + "°");
-
-
-                        myAdapter = new MyAdapter(removeDuplicates(cities));
-                        recyclerView.setAdapter(myAdapter);
-                    }
-                }
-            } catch (JSONException e) {
-
-            }
-
-
-        }
-        ArrayList<City> removeDuplicates(ArrayList<City> list) {
-
-            ArrayList<City> newList = new ArrayList<City>();
-            Set<String> name_of_cities = new HashSet<String>();
-
-
-            for( City item : list ) {
-                if( name_of_cities.add( item.getCity())) {
-                    newList.add( item );
-                }
-            }
-            return newList;
-        }
-    }
-}
