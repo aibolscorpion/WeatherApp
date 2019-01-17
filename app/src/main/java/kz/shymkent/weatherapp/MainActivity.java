@@ -36,7 +36,6 @@ import kz.shymkent.weatherapp.model.Weathers;
 import retrofit2.Retrofit;
 
 public class MainActivity extends AppCompatActivity implements GoogleApiClient.OnConnectionFailedListener {
-    String typedText;
     CompositeDisposable compositeDisposable = new CompositeDisposable();
     AutoCompleteTextView autoCompleteTextView;
     RecyclerView.LayoutManager mLayoutManager;
@@ -98,16 +97,16 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
 
                 @Override
                 public void onTextChanged(CharSequence s, int start, int before, int count) {
+                    if (s.length() > 2) {
 
+                        String typedText = autoCompleteTextView.getText().toString();
+                        fetchData(typedText);
+                    }
                 }
 
                 @Override
                 public void afterTextChanged(Editable s) {
-                    if (s.length() > 2) {
 
-                        typedText = autoCompleteTextView.getText().toString();
-                        fetchData(typedText);
-                    }
                 }
             });
         }
@@ -116,8 +115,8 @@ public class MainActivity extends AppCompatActivity implements GoogleApiClient.O
         super.onStop();
         compositeDisposable.clear();
     }
-    private void fetchData(String typedText){
 
+    private void fetchData(String typedText){
         compositeDisposable.add(myAPI.getWeather(typedText,"metric",OPEN_WEATHER_MAP_API).subscribeOn(Schedulers.io()).observeOn(AndroidSchedulers.mainThread())
                 .subscribe(new Consumer<Weathers>() {
                     @Override

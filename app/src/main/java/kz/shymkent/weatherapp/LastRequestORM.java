@@ -8,7 +8,6 @@ import android.util.Log;
 
 import java.util.ArrayList;
 
-import kz.shymkent.weatherapp.DatabaseWrapper;
 
 public class LastRequestORM {
 

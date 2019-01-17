@@ -7,10 +7,8 @@ import android.database.sqlite.SQLiteDatabase;
 
 import java.util.ArrayList;
 
-import kz.shymkent.weatherapp.DatabaseWrapper;
 import kz.shymkent.weatherapp.model.Main;
 import kz.shymkent.weatherapp.model.Weathers;
-
 public class CityORM {
 
     private static final String TAG = "CityORM";
@@ -22,7 +20,7 @@ public class CityORM {
     private static final String COLUMN_CITY_TYPE = "TEXT";
     private static final String COLUMN_CITY = "city";
 
-    private static final String COLUMN_TEMPERATURE_TYPE = "INTEGER";
+    private static final String COLUMN_TEMPERATURE_TYPE = "DOUBLE";
     private static final String COLUMN_TEMPERATURE = "temperature";
     ;
 
@@ -71,7 +69,7 @@ public class CityORM {
         Weathers weathers = new Weathers();
         weathers.setName(cursor.getString(cursor.getColumnIndex(COLUMN_CITY)));
         weathers.setMain(new Main());
-        weathers.getMain().setTemp(cursor.getInt(cursor.getColumnIndex(COLUMN_TEMPERATURE)));
+        weathers.getMain().setTemp(cursor.getDouble(cursor.getColumnIndex(COLUMN_TEMPERATURE)));
         return weathers;
     }
     private static ContentValues postToContentValues(Weathers weathers) {
